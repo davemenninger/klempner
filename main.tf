@@ -1,8 +1,3 @@
-variable "region" {}
-variable "appname" {}
-variable "githubRepository" {}
-variable "github_oauth_token" {}
-
 resource "aws_iam_role" "codepipeline_role" {
   name = "${var.appname}-codebuild-service"
 
@@ -247,7 +242,7 @@ resource "aws_codebuild_project" "codebuild_build_project" {
     type = "LINUX_CONTAINER"
     image = "aws/codebuild/docker:17.09.0"
     privileged_mode = true
-    environment_variable {
+    environment_variable  = {
       name = "REPOSITORY_URI"
       value = "${aws_ecr_repository.ecr_repository.repository_url}"
     }
