@@ -1,3 +1,7 @@
+# ROLES
+# one for pipeline
+# one for build
+
 resource "aws_iam_role" "codepipeline_role" {
   name = "${var.appname}-codebuild-service"
 
@@ -17,6 +21,83 @@ resource "aws_iam_role" "codepipeline_role" {
 EOF
 }
 
+resource "aws_iam_role" "codebuild_role" {
+  name = "${var.appname}-codebuild-role"
+
+  assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "codebuild.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+EOF
+}
+
+# POLICIES
+# one for pipeline
+# one for build
+
+resource "aws_iam_role_policy" "codebuild_role_policy" {
+  name = "${var.appname}-codebuild_role_policy"
+  role = "${aws_iam_role.codebuild_role.id}"
+
+  policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": [
+          "s3:PutObject",
+          "s3:GetObject",
+          "s3:GetObjectVersion",
+          "s3:GetBucketVersioning"
+      ],
+      "Resource": "*",
+      "Effect": "Allow",
+      "Sid": "AccessCodePipelineArtifacts"
+    },
+    {
+         "Sid":"logStream",
+         "Effect":"Allow",
+         "Action":[
+            "logs:PutLogEvents",
+            "logs:CreateLogGroup",
+            "logs:CreateLogStream"
+         ],
+         "Resource":"arn:aws:logs:${var.region}:*:*"
+    },
+    {
+         "Effect":"Allow",
+         "Action":[
+            "ecr:GetAuthorizationToken"
+         ],
+         "Resource":"*"
+    },
+    {
+         "Effect":"Allow",
+         "Action":[
+            "ecr:GetAuthorizationToken",
+            "ecr:GetDownloadUrlForLayer",
+            "ecr:BatchGetImage",
+            "ecr:BatchCheckLayerAvailability",
+            "ecr:PutImage",
+            "ecr:InitiateLayerUpload",
+            "ecr:UploadLayerPart",
+            "ecr:CompleteLayerUpload"
+         ],
+         "Resource":"${aws_ecr_repository.ecr_repository.arn}"
+    }
+  ]
+}
+EOF
+}
 resource "aws_iam_role_policy" "codepipeline_role_policy" {
   name = "${var.appname}-codepipeline_policy"
   role = "${aws_iam_role.codepipeline_role.id}"
@@ -51,10 +132,20 @@ resource "aws_iam_role_policy" "codepipeline_role_policy" {
 EOF
 }
 
+# BUCKET
+# for source
+
 resource "aws_s3_bucket" "codepipeline_bucket" {
   bucket = "${var.appname}-source"
   acl    = "private"
 }
+
+# PIPELINE
+# stages:
+# - get source
+# - run tests
+# - build and push image
+# - TODO: update running cluster
 
 resource "aws_codepipeline" "codepipeline" {
   name     = "${var.appname}-pipeline"
@@ -124,79 +215,9 @@ resource "aws_codepipeline" "codepipeline" {
   }
 }
 
-resource "aws_iam_role" "codebuild_role" {
-  name = "${var.appname}-codebuild-role"
-
-  assume_role_policy = <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Service": "codebuild.amazonaws.com"
-      },
-      "Action": "sts:AssumeRole"
-    }
-  ]
-}
-EOF
-}
-
-resource "aws_iam_role_policy" "codebuild_role_policy" {
-  name = "${var.appname}-codebuild_role_policy"
-  role = "${aws_iam_role.codebuild_role.id}"
-
-  policy = <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Action": [
-          "s3:PutObject",
-          "s3:GetObject",
-          "s3:GetObjectVersion",
-          "s3:GetBucketVersioning"
-      ],
-      "Resource": "*",
-      "Effect": "Allow",
-      "Sid": "AccessCodePipelineArtifacts"
-    },
-    {
-         "Sid":"logStream",
-         "Effect":"Allow",
-         "Action":[
-            "logs:PutLogEvents",
-            "logs:CreateLogGroup",
-            "logs:CreateLogStream"
-         ],
-         "Resource":"arn:aws:logs:${var.region}:*:*"
-    },
-    {
-         "Effect":"Allow",
-         "Action":[
-            "ecr:GetAuthorizationToken"
-         ],
-         "Resource":"*"
-    },
-    {
-         "Effect":"Allow",
-         "Action":[
-            "ecr:GetAuthorizationToken",
-            "ecr:GetDownloadUrlForLayer",
-            "ecr:BatchGetImage",
-            "ecr:BatchCheckLayerAvailability",
-            "ecr:PutImage",
-            "ecr:InitiateLayerUpload",
-            "ecr:UploadLayerPart",
-            "ecr:CompleteLayerUpload"
-         ],
-         "Resource":"${aws_ecr_repository.ecr_repository.arn}"
-    }
-  ]
-}
-EOF
-}
+# CODEBUILD
+# one for running tests
+# one for build and push image
 
 resource "aws_codebuild_project" "codebuild_test_project" {
   artifacts = {
@@ -272,6 +293,9 @@ artifacts:
 EOF
   }
 }
+
+# ECR REPOSITORY
+# to store our built images
 
 resource "aws_ecr_repository" "ecr_repository" {
   name = "${var.appname}"
