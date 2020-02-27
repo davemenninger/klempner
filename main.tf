@@ -168,7 +168,7 @@ resource "aws_codepipeline" "codepipeline" {
       version          = "1"
       output_artifacts = ["Source"]
 
-      configuration {
+      configuration = {
         Owner      = "davemenninger"
         Repo       = "${var.githubRepository}"
         Branch     = "master"
@@ -189,7 +189,7 @@ resource "aws_codepipeline" "codepipeline" {
       output_artifacts = ["TestOutput"]
       version          = "1"
 
-      configuration {
+      configuration = {
         ProjectName = "${var.appname}-codebuild-test"
       }
     }
@@ -207,7 +207,7 @@ resource "aws_codepipeline" "codepipeline" {
       output_artifacts = ["BuildOutput"]
       version          = "1"
 
-      configuration {
+      configuration = {
         ProjectName   = "${var.appname}-codebuild-build"
         PrimarySource = "Source"
       }
