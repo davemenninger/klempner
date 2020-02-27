@@ -168,7 +168,7 @@ resource "aws_codepipeline" "codepipeline" {
       version          = "1"
       output_artifacts = ["Source"]
 
-      configuration = {
+      configuration {
         Owner      = "davemenninger"
         Repo       = "${var.githubRepository}"
         Branch     = "master"
@@ -189,7 +189,7 @@ resource "aws_codepipeline" "codepipeline" {
       output_artifacts = ["TestOutput"]
       version          = "1"
 
-      configuration = {
+      configuration {
         ProjectName = "${var.appname}-codebuild-test"
       }
     }
@@ -207,7 +207,7 @@ resource "aws_codepipeline" "codepipeline" {
       output_artifacts = ["BuildOutput"]
       version          = "1"
 
-      configuration = {
+      configuration {
         ProjectName   = "${var.appname}-codebuild-build"
         PrimarySource = "Source"
       }
@@ -220,11 +220,11 @@ resource "aws_codepipeline" "codepipeline" {
 # one for build and push image
 
 resource "aws_codebuild_project" "codebuild_test_project" {
-  artifacts = {
+  artifacts {
     type = "CODEPIPELINE"
   }
 
-  environment = {
+  environment {
     compute_type    = "BUILD_GENERAL1_SMALL"
     type            = "LINUX_CONTAINER"
     image           = "aws/codebuild/docker:17.09.0"
@@ -234,7 +234,7 @@ resource "aws_codebuild_project" "codebuild_test_project" {
   name         = "${var.appname}-codebuild-test"
   service_role = "${aws_iam_role.codebuild_role.id}"
 
-  source = {
+  source {
     type = "CODEPIPELINE"
 
     buildspec = <<EOF
@@ -256,17 +256,17 @@ EOF
 }
 
 resource "aws_codebuild_project" "codebuild_build_project" {
-  artifacts = {
+  artifacts {
     type = "CODEPIPELINE"
   }
 
-  environment = {
+  environment {
     compute_type    = "BUILD_GENERAL1_SMALL"
     type            = "LINUX_CONTAINER"
     image           = "aws/codebuild/docker:17.09.0"
     privileged_mode = true
 
-    environment_variable = {
+    environment_variable {
       name  = "REPOSITORY_URI"
       value = "${aws_ecr_repository.ecr_repository.repository_url}"
     }
@@ -275,7 +275,7 @@ resource "aws_codebuild_project" "codebuild_build_project" {
   name         = "${var.appname}-codebuild-build"
   service_role = "${aws_iam_role.codebuild_role.id}"
 
-  source = {
+  source {
     type = "CODEPIPELINE"
 
     buildspec = <<EOF
