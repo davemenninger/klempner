@@ -5,7 +5,7 @@
 resource "aws_iam_role" "codepipeline_role" {
   name = "${var.appname}-codebuild-service"
 
- assume_role_policy = <<EOF
+  assume_role_policy = <<EOF
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -98,6 +98,7 @@ resource "aws_iam_role_policy" "codebuild_role_policy" {
 }
 EOF
 }
+
 resource "aws_iam_role_policy" "codepipeline_role_policy" {
   name = "${var.appname}-codepipeline_policy"
   role = "${aws_iam_role.codepipeline_role.id}"
@@ -151,7 +152,6 @@ resource "aws_codepipeline" "codepipeline" {
   name     = "${var.appname}-pipeline"
   role_arn = "${aws_iam_role.codepipeline_role.arn}"
 
-
   artifact_store {
     location = "${aws_s3_bucket.codepipeline_bucket.bucket}"
     type     = "S3"
@@ -169,9 +169,9 @@ resource "aws_codepipeline" "codepipeline" {
       output_artifacts = ["Source"]
 
       configuration = {
-        Owner  = "davemenninger"
-        Repo   = "${var.githubRepository}"
-        Branch = "master"
+        Owner      = "davemenninger"
+        Repo       = "${var.githubRepository}"
+        Branch     = "master"
         OAuthToken = "${var.github_oauth_token}"
       }
     }
@@ -203,7 +203,7 @@ resource "aws_codepipeline" "codepipeline" {
       category         = "Build"
       owner            = "AWS"
       provider         = "CodeBuild"
-      input_artifacts  = ["TestOutput","Source"]
+      input_artifacts  = ["TestOutput", "Source"]
       output_artifacts = ["BuildOutput"]
       version          = "1"
 
@@ -225,16 +225,18 @@ resource "aws_codebuild_project" "codebuild_test_project" {
   }
 
   environment = {
-    compute_type = "BUILD_GENERAL1_SMALL"
-    type = "LINUX_CONTAINER"
-    image = "aws/codebuild/docker:17.09.0"
+    compute_type    = "BUILD_GENERAL1_SMALL"
+    type            = "LINUX_CONTAINER"
+    image           = "aws/codebuild/docker:17.09.0"
     privileged_mode = true
   }
 
-  name = "${var.appname}-codebuild-test"
+  name         = "${var.appname}-codebuild-test"
   service_role = "${aws_iam_role.codebuild_role.id}"
+
   source = {
     type = "CODEPIPELINE"
+
     buildspec = <<EOF
 version: 0.2
 phases:
@@ -259,20 +261,23 @@ resource "aws_codebuild_project" "codebuild_build_project" {
   }
 
   environment = {
-    compute_type = "BUILD_GENERAL1_SMALL"
-    type = "LINUX_CONTAINER"
-    image = "aws/codebuild/docker:17.09.0"
+    compute_type    = "BUILD_GENERAL1_SMALL"
+    type            = "LINUX_CONTAINER"
+    image           = "aws/codebuild/docker:17.09.0"
     privileged_mode = true
-    environment_variable  = {
-      name = "REPOSITORY_URI"
+
+    environment_variable = {
+      name  = "REPOSITORY_URI"
       value = "${aws_ecr_repository.ecr_repository.repository_url}"
     }
   }
 
-  name = "${var.appname}-codebuild-build"
+  name         = "${var.appname}-codebuild-build"
   service_role = "${aws_iam_role.codebuild_role.id}"
+
   source = {
     type = "CODEPIPELINE"
+
     buildspec = <<EOF
 version: 0.2
 phases:
