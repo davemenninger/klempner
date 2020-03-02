@@ -305,3 +305,10 @@ EOF
 resource "aws_ecr_repository" "ecr_repository" {
   name = "${var.appname}"
 }
+
+# ECS Cluster
+# run our app
+
+resource "aws_ecs_cluster" "foo" {
+  name = "${var.appname}-cluster"
+}
