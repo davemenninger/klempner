@@ -22,8 +22,8 @@ resource "aws_ecs_service" "phoenix_service" {
   launch_type     = "FARGATE"
 
   load_balancer {
-    target_group_arn = "${aws_lb_target_group.foo.arn}"
-    container_name   = "foo"
+    target_group_arn = "${aws_lb_target_group.phx.arn}"
+    container_name   = "phx"
     container_port   = 4000
   }
 
@@ -47,22 +47,30 @@ resource "aws_ecs_task_definition" "phoenix_task" {
   execution_role_arn = "${aws_iam_role.fargate_role.arn}"
 }
 
-resource "aws_lb_target_group" "foo" {
-  name     = "tf-example-lb-tg"
+resource "aws_lb_target_group" "phx" {
   port     = 80
   protocol = "HTTP"
   vpc_id   = "${var.vpc_id}"
   target_type = "ip"
 }
 
-resource "aws_lb" "test" {
-  name               = "test-lb-tf"
+resource "aws_lb" "phx_lb" {
   internal           = false
   load_balancer_type = "application"
   security_groups    = ["${aws_security_group.lb_sg.id}"]
   subnets            = "${var.subnets}"
+}
 
-  enable_deletion_protection = true
+resource "aws_security_group" "fargate_container_sg" {
+  vpc_id      = "${var.vpc_id}"
+
+  ingress {
+    from_port       = 80
+    to_port         = 5432
+    protocol        = "tcp"
+    cidr_blocks = [ "10.0.1.0/24" ]
+
+  }
 }
 
 resource "aws_security_group" "lb_sg" {
@@ -136,19 +144,19 @@ resource "aws_iam_role_policy" "fargate_role_policy" {
 EOF
 }
 
-resource "aws_lb_listener" "foo" {
-  load_balancer_arn = "${aws_lb.test.arn}"
+resource "aws_lb_listener" "public_web" {
+  load_balancer_arn = "${aws_lb.phx_lb.arn}"
   port              = "80"
   protocol          = "HTTP"
 
   default_action {
     type             = "forward"
-    target_group_arn = "${aws_lb_target_group.foo.arn}"
+    target_group_arn = "${aws_lb_target_group.phx.arn}"
   }
 }
 
-resource "aws_cloudwatch_log_group" "foo" {
-  name = "/ecs/foo"
+resource "aws_cloudwatch_log_group" "phoenix_logs" {
+  name = "/ecs/phoenix_logs"
 }
 
 resource "random_password" "rds_password" {
@@ -158,22 +166,21 @@ resource "random_password" "rds_password" {
 }
 
 resource "aws_ssm_parameter" "rds_password" {
-  name  = "foo_password"
+  name  = "${var.appname}-rds-password"
   type  = "String"
   value = "${random_password.rds_password.result}"
 }
 
-resource "aws_db_instance" "foo_db" {
+resource "aws_db_instance" "rds_instance" {
   allocated_storage    = 20
   engine               = "postgres"
   instance_class       = "db.t2.micro"
-  name                 = "foo_db"
   username             = "postgres"
   password             = "${random_password.rds_password.result}"
 }
 
 resource "aws_ssm_parameter" "rds_ecto_url" {
-  name  = "foo_database_url"
+  name  = "${var.appname}-database-url"
   type  = "String"
-  value = "ecto://postgres:${random_password.rds_password.result}@${aws_db_instance.foo_db.endpoint}/${var.appname}"
+  value = "ecto://postgres:${random_password.rds_password.result}@${aws_db_instance.rds_instance.endpoint}/${var.appname}"
 }
