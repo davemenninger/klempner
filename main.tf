@@ -1,3 +1,25 @@
+# GET STUFF FROM CF EXPORTS
+
+data "aws_cloudformation_export" "vpcid" {
+  name = "${var.vpc_cf_export_name}"
+}
+
+# TODO
+# this would be better as a List, but getting list from CF is???
+data "aws_cloudformation_export" "subnet_1" {
+  name = "${var.subnet_1_cf_export_name}"
+}
+data "aws_cloudformation_export" "subnet_2" {
+  name = "${var.subnet_2_cf_export_name}"
+}
+
+# TODO
+# this task definition has to exist so we can use it as a data source
+# hacky way: run terraform apply twice
+data "aws_ecs_task_definition" "phoenix_task" {
+  task_definition = "${aws_ecs_task_definition.phoenix_task.family}"
+}
+
 # ECR REPOSITORY
 # to store our built images
 
@@ -28,13 +50,12 @@ resource "aws_ecs_service" "phoenix_service" {
   }
 
   network_configuration {
-    subnets = "${var.subnets}"
+    subnets = [
+      "${data.aws_cloudformation_export.subnet_1.value}",
+      "${data.aws_cloudformation_export.subnet_2.value}"
+    ]
     security_groups = ["${aws_security_group.lb_sg.id}"]
   }
-}
-
-data "aws_ecs_task_definition" "phoenix_task" {
-  task_definition = "${aws_ecs_task_definition.phoenix_task.family}"
 }
 
 resource "aws_ecs_task_definition" "phoenix_task" {
@@ -50,19 +71,25 @@ resource "aws_ecs_task_definition" "phoenix_task" {
 resource "aws_lb_target_group" "phx" {
   port     = 80
   protocol = "HTTP"
-  vpc_id   = "${var.vpc_id}"
+  vpc_id   = "${data.aws_cloudformation_export.vpcid.value}"
   target_type = "ip"
 }
+
+# TODO: fix these security groups
+
 
 resource "aws_lb" "phx_lb" {
   internal           = false
   load_balancer_type = "application"
   security_groups    = ["${aws_security_group.lb_sg.id}"]
-  subnets            = "${var.subnets}"
+  subnets = [
+    "${data.aws_cloudformation_export.subnet_1.value}",
+    "${data.aws_cloudformation_export.subnet_2.value}"
+  ]
 }
 
 resource "aws_security_group" "fargate_container_sg" {
-  vpc_id      = "${var.vpc_id}"
+  vpc_id      = "${data.aws_cloudformation_export.vpcid.value}"
 
   ingress {
     from_port       = 80
@@ -76,7 +103,7 @@ resource "aws_security_group" "fargate_container_sg" {
 resource "aws_security_group" "lb_sg" {
   name        = "allow_tls"
   description = "Allow TLS inbound traffic"
-  vpc_id      = "${var.vpc_id}"
+  vpc_id      = "${data.aws_cloudformation_export.vpcid.value}"
 
   egress {
     from_port       = 0
